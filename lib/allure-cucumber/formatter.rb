@@ -55,8 +55,9 @@ module AllureCucumber
     def before_step(step)
       unless step.background?
         unless @scenario_outline
+          @tracker.step_id = step.backtrace_line
           @tracker.step_name = step.name
-          AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, @tracker.step_name) 
+          AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:id=>@tracker.step_id, :name=>@tracker.step_name}) 
           attach_multiline_arg(step.multiline_arg)
         else
           @example_before_steps << step
@@ -69,7 +70,7 @@ module AllureCucumber
     def after_step(step)
       unless step.background?
         unless @scenario_outline
-         AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, @tracker.step_name, step.status.to_sym)
+         AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:id=>@tracker.step_id, :name=>@tracker.step_name}, step.status.to_sym)
         else
           @example_after_steps << step
         end
@@ -125,9 +126,9 @@ module AllureCucumber
         @tracker.scenario_started_at = Time.now
         post_background_steps if @has_background
         @current_row += 1
-        @example_before_steps.each do |step| 
+        @example_before_steps.each do |step|
           @tracker.step_name = transform_step_name_for_outline(step.name, @current_row)
-          AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, @tracker.step_name)
+          AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:name=>@tracker.step_name})
           attach_multiline_arg(step.multiline_arg)  
         end
       end
@@ -136,13 +137,13 @@ module AllureCucumber
     def after_table_row(table_row)
       return unless @in_examples or Cucumber::Ast::OutlineTable::ExampleRow === table_row
       unless @header_row
-        @example_after_steps.each do |step| 
+        @example_after_steps.each do |step|
           @tracker.step_name = transform_step_name_for_outline(step.name, @current_row)
           if table_row.status == :failed
             @exception = table_row.exception
             @scenario_status = :failed
           end      
-          AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, @tracker.step_name, step.status.to_sym)
+          AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:name=>@tracker.step_name}, step.status.to_sym)
         end
         AllureRubyAdaptorApi::Builder.stop_test(@tracker.feature_name, @tracker.scenario_name, {:status => @scenario_status, :exception => @exception, :started_at => @tracker.scenario_started_at, :finished_at => Time.now })
       end
@@ -181,12 +182,12 @@ module AllureCucumber
     def post_background_steps
       @background_before_steps.each do |step|
         @tracker.step_name = "Background : #{step.name}"
-        AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, @tracker.step_name)
+        AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:name=>@tracker.step_name})
         attach_multiline_arg(step.multiline_arg)
       end
       @background_before_steps.each do |step|
         @tracker.step_name = "Background : #{step.name}"
-        AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, @tracker.step_name, step.status.to_sym)        
+        AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:name=>@tracker.step_name}, step.status.to_sym)        
         attach_multiline_arg(step.multiline_arg)
       end     
     end
