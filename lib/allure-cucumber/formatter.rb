@@ -49,6 +49,7 @@ module AllureCucumber
     def before_steps(steps)
       @example_before_steps = []
       @example_after_steps = []
+      @before_hook_exception = nil
       @exception = nil
     end
 
