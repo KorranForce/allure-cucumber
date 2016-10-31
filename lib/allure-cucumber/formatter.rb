@@ -49,7 +49,6 @@ module AllureCucumber
     def before_steps(steps)
       @example_before_steps = []
       @example_after_steps = []
-      @before_hook_exception = nil
       @exception = nil
     end
 
@@ -89,6 +88,7 @@ module AllureCucumber
     def after_steps(steps)
       return if @in_background || @scenario_outline
       exception = @before_hook_exception ? @before_hook_exception : steps.exception
+      @before_hook_exception = nil
       result = { :status => steps.status, :exception => exception, :started_at => @tracker.scenario_started_at, :finished_at => Time.now }
       AllureRubyAdaptorApi::Builder.stop_test(@tracker.feature_name, @tracker.scenario_name, result)
     end
