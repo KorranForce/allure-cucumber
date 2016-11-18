@@ -129,7 +129,7 @@ module AllureCucumber
         @current_row += 1
         @example_before_steps.each do |step|
           @tracker.step_name = transform_step_name_for_outline(step.name, @current_row)
-          AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:name=>@tracker.step_name})
+          AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step.backtrace_line, :name=>@tracker.step_name})
           attach_multiline_arg(step.multiline_arg)  
         end
       end
@@ -144,7 +144,7 @@ module AllureCucumber
             @exception = table_row.exception
             @scenario_status = :failed
           end      
-          AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:name=>@tracker.step_name}, step.status.to_sym)
+          AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step.backtrace_line, :name=>@tracker.step_name}, step.status.to_sym)
         end
         AllureRubyAdaptorApi::Builder.stop_test(@tracker.feature_name, @tracker.scenario_name, {:status => @scenario_status, :exception => @exception, :started_at => @tracker.scenario_started_at, :finished_at => Time.now })
       end
