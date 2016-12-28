@@ -109,6 +109,7 @@ module AllureCucumber
     def before_test_step(test_step)
       if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name) 
         if @tracker.scenario_name
+          @tracker.step_id = test_step.location.to_s
           @tracker.step_name = test_step.name
           start_step
         else
@@ -235,12 +236,12 @@ module AllureCucumber
       end
     end
     
-    def start_step(step_name = @tracker.step_name)
-      AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, step_name) 
+    def start_step(step_id = @tracker.step_id, step_name = @tracker.step_name)
+      AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step_id, :name=>step_name}) 
     end
 
-    def stop_step(status, step_name = @tracker.step_name)
-      AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, step_name, status) 
+    def stop_step(status, step_id = @tracker.step_id, step_name = @tracker.step_name)
+      AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step_id, :name=>step_name}, status) 
     end
     
   end  
