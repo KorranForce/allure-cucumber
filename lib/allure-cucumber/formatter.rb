@@ -173,7 +173,12 @@ module AllureCucumber
       if @before_hook_exception
         exception = @before_hook_exception
       else
+        if status == 'pending'
+          exception = Exception.new(result.exception.message)
+          exception.set_backtrace(result.exception.backtrace)
+        else
         exception = status == 'failed' && result.exception.nil? ? Exception.new("Some steps were undefined") : result.exception
+      end
       end
       if exception 
         return {:status => status, :exception => exception}
