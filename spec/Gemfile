@@ -1,0 +1,16 @@
+# A sample Gemfile
+# encoding: utf-8
+
+if RUBY_VERSION =~ /2.0/
+  Encoding.default_external = Encoding::UTF_8
+  Encoding.default_internal = Encoding::UTF_8
+end
+
+source "http://rubygems.org"
+
+gem "cucumber"
+gem "allure-ruby-adaptor-api", :git => "https://github.com/KorranForce/allure-ruby-adaptor-api.git", :branch => 'master'
+gem "rspec"
+gem "unicode"
+gem "russian"
+#gem 'pry'
