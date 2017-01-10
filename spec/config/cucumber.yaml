@@ -1,4 +1,4 @@
 ---
-common: -r step_definitions -r support
+common: -r features/step_definitions -r features/support
 debug: -p common DEBUG=true
 full: -p debug DEBUG=false --format AllureCucumber::Formatter
