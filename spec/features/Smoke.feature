@@ -5,7 +5,7 @@ Feature: Smoke
   Scenario Outline: Проверка наличия параметров
     Then Table step with param <parameter>
     When Not table step
-    Then Table step with param <parameter>
+    Then Table step2 with param <parameter>
     Examples:
       |parameter|
       |iOS|
