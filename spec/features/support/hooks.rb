@@ -7,3 +7,7 @@ end
 AllureCucumber.configure do |c|
   c.output_dir = __dir__ + "/../../report_xml/"
 end
+
+Before('@table_outline_fail') do
+ pending
+end

@@ -6,7 +6,7 @@ module AllureCucumber
   class Formatter
 
     include AllureCucumber::DSL
-    
+
     TEST_HOOK_NAMES_TO_IGNORE = ['Before hook', 'After hook', 'AfterStep hook']
     ALLOWED_SEVERITIES = ['blocker', 'critical', 'normal', 'minor', 'trivial']
     POSSIBLE_STATUSES = ['passed', 'failed', 'pending', 'skipped', 'undefined']
@@ -17,11 +17,12 @@ module AllureCucumber
       FileUtils.rm_rf(dir) unless AllureCucumber::Config.clean_dir == false
       FileUtils.mkdir_p(dir)
       @tracker = AllureCucumber::FeatureTracker.create
+      @first_test_steps = {}
       @deferred_before_test_steps = []
       @deferred_after_test_steps = []
       @scenario_tags = {}
     end
-    
+
     # Start the test suite
     def before_feature(feature)
       feature_identifier = ENV['FEATURE_IDENTIFIER'] && "#{ENV['FEATURE_IDENTIFIER']} - "
@@ -33,10 +34,10 @@ module AllureCucumber
     def before_feature_element(feature_element)
       @scenario_outline = feature_element.instance_of?(Cucumber::Core::Ast::ScenarioOutline)
     end
-    
+
     def scenario_name(keyword, name, *args)
       scenario_name = (name.nil? || name == "") ? "Unnamed scenario" : name.gsub(/\n/, " ")
-      @scenario_outline ? @scenario_outline_name = scenario_name : @tracker.scenario_name = scenario_name 
+      @scenario_outline ? @scenario_outline_name = scenario_name : @tracker.scenario_name = scenario_name
     end
 
     # Analyze Cucumber Scenario Tags
@@ -66,7 +67,7 @@ module AllureCucumber
 
     # Start the test for normal scenarios
     def before_steps(steps)
-      if !@scenario_outline  
+      if !@scenario_outline
         start_test
       end
     end
@@ -92,33 +93,45 @@ module AllureCucumber
       if @scenario_outline && !@header_row && !@in_multiline_arg
         @tracker.scenario_name = "#{@scenario_outline_name}: #{table_row.values.join(' | ')}"
         start_test
+        @first_test_steps.each{|index,step|
+          p step
+          add_step(step[:step],index)
+        }
       end
     end
 
-    # Stop the test for scenario examples 
+    # Stop the test for scenario examples
     def after_table_row(table_row)
       unless @multiline_arg
-        if @scenario_outline && !@header_row 
+        if @scenario_outline && !@header_row
           @result = test_result(table_row)
           stop_test(@result)
         end
         @header_row = false
       end
     end
-    
+
     def before_test_step(test_step)
-      if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name) 
+      p 'bef:' + test_step.name.to_s
+      if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
         if @tracker.scenario_name
-          @tracker.step_id = test_step.location.to_s
-          @tracker.step_name = test_step.name
-          start_step
-        else
+          add_step(test_step)
+        elsif test_step.name.include?('hook')
           @deferred_before_test_steps << {:step => test_step, :timestamp => Time.now}
-        end        
+        else
+          @first_test_steps[@step_index += 1] = {:step => test_step, :timestamp => Time.now}
+        end
       end
     end
-    
+
+    def add_step(test_step, step_index=@step_index += 1)
+        @tracker.step_id = step_index
+        @tracker.step_name = test_step.name + @tracker.step_id.to_s
+        start_step
+    end
+      
     def after_test_step(test_step, result)
+      p 'aft:' + test_step.name.to_s
       if test_step.name == 'Before hook'
         if (!@before_hook_exception) && result.methods.include?(:exception)
           @before_hook_exception = result.exception
@@ -128,7 +141,7 @@ module AllureCucumber
           status = step_status(result)
           stop_step(status)
         else
-          @deferred_after_test_steps << {:step => test_step, :result => result, :timestamp => Time.now}
+          @deferred_after_test_steps[@step_index] = {:step => test_step, :result => result, :timestamp => Time.now}
         end
       end
     end
@@ -141,7 +154,7 @@ module AllureCucumber
     def after_features(features)
       AllureRubyAdaptorApi::Builder.build!
     end
-    
+
     def before_multiline_arg(multiline_arg)
       @in_multiline_arg = true
       # For background steps defer multiline attachment
@@ -155,19 +168,19 @@ module AllureCucumber
     def after_multiline_arg(multiline_arg)
       @in_multiline_arg = false
     end
-    
+
     private
 
     def remove_tag_prefix(tag, prefix)
       tag.gsub(prefix,'')
     end
-    
+
     def step_status(result)
       POSSIBLE_STATUSES.each do |status|
         return cucumber_status_to_allure_status(status) if result.send("#{status}?")
       end
     end
-    
+
     def test_result(result)
       status = cucumber_status_to_allure_status(result.status)
       if @before_hook_exception
@@ -177,10 +190,10 @@ module AllureCucumber
           exception = Exception.new(result.exception.message)
           exception.set_backtrace(result.exception.backtrace)
         else
-        exception = status == 'failed' && result.exception.nil? ? Exception.new("Some steps were undefined") : result.exception
+          exception = status == 'failed' && result.exception.nil? ? Exception.new("Some steps were undefined") : result.exception
+        end
       end
-      end
-      if exception 
+      if exception
         return {:status => status, :exception => exception}
       else
         return {:status => status}
@@ -189,23 +202,24 @@ module AllureCucumber
 
     def cucumber_status_to_allure_status(status)
       case status.to_s
-        when "undefined"
-          return "broken"
-        when "skipped"
-          return "canceled"
-        else
-          return status.to_s
+      when "undefined"
+        return "broken"
+      when "skipped"
+        return "canceled"
+      else
+        return status.to_s
       end
     end
-    
+
     def attach_multiline_arg_to_file(multiline_arg)
       dir = File.expand_path(AllureCucumber::Config.output_dir)
-      out_file = "#{dir}/#{UUID.new.generate}.txt"     
+      out_file = "#{dir}/#{UUID.new.generate}.txt"
       File.open(out_file, "w+") { |file| file.write(multiline_arg.to_s.gsub(/\e\[(\d+)(;\d+)*m/,'')) }
       attach_file("multiline_arg", File.open(out_file))
     end
 
     def start_test
+      @step_index = 0
       if @tracker.scenario_name
         @scenario_tags[:feature] = @tracker.feature_name
         @scenario_tags[:story]   = @tracker.scenario_name
@@ -216,7 +230,7 @@ module AllureCucumber
 
     def post_deferred_steps
       @deferred_before_test_steps.size.times do |index|
-        @tracker.step_name = @deferred_before_test_steps[index][:step].name 
+        @tracker.step_name = @deferred_before_test_steps[index][:step].name
         start_step
         multiline_arg = @deferred_before_test_steps[index][:multiline_arg]
         attach_multiline_arg_to_file(multiline_arg) if multiline_arg
@@ -226,7 +240,7 @@ module AllureCucumber
         end
       end
     end
-    
+
     def stop_test(result)
       if @deferred_before_test_steps != []
         result[:started_at] = @deferred_before_test_steps[0][:timestamp]
@@ -240,15 +254,14 @@ module AllureCucumber
         @before_hook_exception = nil
       end
     end
-    
+
     def start_step(step_id = @tracker.step_id, step_name = @tracker.step_name)
-      AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step_id, :name=>step_name}) 
+      AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step_id, :name=>step_name})
     end
 
     def stop_step(status, step_id = @tracker.step_id, step_name = @tracker.step_name)
-      AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step_id, :name=>step_name}, status) 
+      AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:id=>step_id, :name=>step_name}, status)
     end
-    
-  end  
-end
 
+  end
+end
