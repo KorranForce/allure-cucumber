@@ -177,9 +177,9 @@ module AllureCucumber
       else
         exception = status == 'failed' && result.exception.nil? ? Exception.new("Some steps were undefined") : result.exception
       end
-      if status == 'pending'
-        exception = Exception.new(result.exception.message)
-        exception.set_backtrace(result.exception.backtrace)
+      if status == 'pending' || status == 'canceled'
+        exception = Exception.new(exception.message)
+        exception.set_backtrace(exception.backtrace)
       end
       
       if exception 
