@@ -181,8 +181,9 @@ module AllureCucumber
       end
       #exception can be nil here if after step hook failed
       if status == 'pending' || status == 'canceled'
-        exception = Exception.new(exception.message)
-        exception.set_backtrace(exception.backtrace)
+        exc = Exception.new(exception.message)
+        exc.set_backtrace(exception.backtrace)
+        exception = exc
       end
       
       if exception 
