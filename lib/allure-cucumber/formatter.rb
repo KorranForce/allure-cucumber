@@ -120,13 +120,11 @@ module AllureCucumber
     end
     
     def after_test_step(test_step, result)
-      #TO DO: add handling of exceptions from all hooks
-      if test_step.name == 'Before hook'
-        if (!@before_hook_exception) && result.methods.include?(:exception)
-          @before_hook_exception = result.exception
+      if TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
+        if (!@hook_exception) && result.methods.include?(:exception)
+          @hook_exception = result.exception
         end
-      end
-      if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
+      else
         if @tracker.scenario_name
           status = step_status(result)
           stop_step(status)
@@ -172,14 +170,18 @@ module AllureCucumber
     end
     
     def test_result(result)
-      #TO DO: add handling of exceptions from all hooks
       status = cucumber_status_to_allure_status(result.status)
-      if @before_hook_exception
-        exception = @before_hook_exception
+
+      if result.exception
+        exception = result.exception
       else
-        exception = status == 'failed' && result.exception.nil? ? Exception.new("Some steps were undefined") : result.exception
+        if status == 'failed'
+          exception = Exception.new("Some steps were undefined")
+        else
+          exception = @hook_exception
+        end
       end
-      #exception can be nil here if after step hook failed
+
       if status == 'pending' || status == 'canceled'
         exc = Exception.new(exception.message)
         exc.set_backtrace(exception.backtrace)
@@ -245,7 +247,7 @@ module AllureCucumber
         @deferred_before_test_steps = []
         @deferred_after_test_steps = []
         @scenario_tags = {}
-        @before_hook_exception = nil
+        @hook_exception = nil
       end
     end
     
