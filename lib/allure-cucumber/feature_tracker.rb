@@ -2,7 +2,7 @@ module AllureCucumber
   
   class FeatureTracker
 
-    attr_accessor :feature_name, :scenario_name, :step_name, :step_index
+    attr_accessor :feature_name, :scenario_name, :scenario_start_time, :step_name, :step_index, :step_start_time, :step_stop_time
     @@tracker = nil
 
     def self.create
