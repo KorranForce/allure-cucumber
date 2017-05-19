@@ -80,7 +80,6 @@ module AllureCucumber
 		def on_before_test_step(event)
 			test_step = event.test_step
 			if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
-				@tracker.step_start_time = Time.now
 				@tracker.step_index += 1
 				@tracker.step_name = test_step.name
 				AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {index: @tracker.step_index, title: @tracker.step_name, start: Time.now})
