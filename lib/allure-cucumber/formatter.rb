@@ -27,32 +27,6 @@ module AllureCucumber
 			@tracker.step_index = -1
 			@tracker.feature_name = nil
 		end
-		# def method_missing(*args)
-		# 	p args
-		# end
-
-# feature.methods
-# [:language, :location, :background, :comments, :tags, :keyword, :description, :feature_elements,
-#  :children, :short_name, :to_sexp, :describe_to, :file_colon_line, :file, :line, :all_locations,
-#  :attributes, :multiline_arg, :name, :legacy_conflated_name_and_description, :to_s, :inspect]
-
-# test_case.methods
-# [:source, :test_steps, :around_hooks, :step_count, :describe_to, :describe_source_to,
-#  :with_steps, :with_around_hooks, :name, :keyword, :tags, :match_tags?, :match_name?,
-#  :language, :location, :match_locations?, :all_locations, :all_source, :inspect, :feature]
-
-# result.methods #with exception
-# [:duration, :exception, :describe_to, :to_s, :ok?, :with_duration, :with_appended_backtrace,
-#  :with_filtered_backtrace, :to_sym, :passed?, :failed?, :undefined?, :unknown?, :skipped?, :pending?]
-# result.methods #without exception
-# [:duration, :duration=, :describe_to, :to_s, :ok?, :with_appended_backtrace, :with_filtered_backtrace,
-#  :to_sym, :passed?, :failed?, :undefined?, :unknown?, :skipped?, :pending?]
-# result.methods #pending
-# [:describe_to, :to_s, :ok?, :to_sym, :passed?, :failed?, :undefined?, :unknown?, :skipped?,
-#  :pending?, :message, :duration, :with_message, :with_duration, :with_appended_backtrace,
-#  :with_filtered_backtrace, :exception, :==, :inspect, :backtrace, :backtrace_locations, :set_backtrace, :cause]
-
-
 		def before_feature(feature)
 			@tracker.feature_name = feature.name
 			AllureRubyAdaptorApi::Builder.start_suite(@tracker.feature_name)
