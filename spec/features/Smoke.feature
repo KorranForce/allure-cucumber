@@ -10,3 +10,9 @@ Feature: Smoke
       |parameter|
       |iOS|
       |Android|
+
+  @test
+  Scenario: Test
+    Then Table step with param iOS
+    When Not table step
+    Then Table step2 with param Android
