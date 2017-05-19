@@ -3,262 +3,130 @@ require 'uuid'
 require 'allure-ruby-adaptor-api'
 
 module AllureCucumber
-  class Formatter
+	class Formatter
+		include AllureCucumber::DSL
 
-    include AllureCucumber::DSL
-    
-    TEST_HOOK_NAMES_TO_IGNORE = ['Before hook', 'After hook', 'AfterStep hook']
-    ALLOWED_SEVERITIES = ['blocker', 'critical', 'normal', 'minor', 'trivial']
-    POSSIBLE_STATUSES = ['passed', 'failed', 'pending', 'skipped', 'undefined']
+		TEST_HOOK_NAMES_TO_IGNORE = ['Before hook', 'After hook', 'AfterStep hook']
+		#ALLOWED_SEVERITIES = ['blocker', 'critical', 'normal', 'minor', 'trivial']
+		POSSIBLE_STATUSES = ['passed', 'failed', 'undefined', 'unknown', 'skipped', 'pending']
 
-    def initialize(step_mother, path_or_io, options)
-      AllureCucumber::Config.output_dir = path_or_io if path_or_io.is_a?(String)
-      dir = Pathname.new(AllureCucumber::Config.output_dir)
-      FileUtils.rm_rf(dir) unless AllureCucumber::Config.clean_dir == false
-      FileUtils.mkdir_p(dir)
-      @tracker = AllureCucumber::FeatureTracker.create
-      @tracker.scenario_start_time = nil
-      @tracker.step_index = -1
-      #deferred steps - those executing before we know about scenario they belong to
-      @deferred_before_test_steps = []
-      @deferred_after_test_steps = []
-      @scenario_tags = {}
-    end
-    
-    # Start the test suite
-    def before_feature(feature)
-      feature_identifier = ENV['FEATURE_IDENTIFIER'] && "#{ENV['FEATURE_IDENTIFIER']} - "
-      @tracker.feature_name = "#{feature_identifier}#{feature.name.gsub(/\n/, " ")}"
-      AllureRubyAdaptorApi::Builder.start_suite(@tracker.feature_name)
-    end
+		def initialize(config)
+			#@output_stream = config.out_stream
+			config.on_event :before_test_case, &method(:on_before_test_case)
+			config.on_event :after_test_case, &method(:on_after_test_case)
+			config.on_event :before_test_step, &method(:on_before_test_step)
+			config.on_event :after_test_step, &method(:on_after_test_step)
+			config.on_event :finished_testing, &method(:on_finished_testing)
+			#config.on_event :step_match, &method(:method_missing)
 
-    # Find scenario type
-    def before_feature_element(feature_element)
-      @scenario_outline = feature_element.instance_of?(Cucumber::Core::Ast::ScenarioOutline)
-    end
-    
-    def scenario_name(keyword, name, *args)
-      scenario_name = (name.nil? || name == "") ? "Unnamed scenario" : name.gsub(/\n/, " ")
-      @scenario_outline ? @scenario_outline_name = scenario_name : @tracker.scenario_name = scenario_name 
-    end
+			AllureCucumber::Config.output_dir = config.out_stream if config.out_stream.is_a?(String)
+			dir = Pathname.new(AllureCucumber::Config.output_dir)
+			FileUtils.rm_rf(dir) unless AllureCucumber::Config.clean_dir == false
+			FileUtils.mkdir_p(dir)
+			@tracker = AllureCucumber::FeatureTracker.create
+			@tracker.step_index = -1
+			@tracker.feature_name = nil
+		end
+		# def method_missing(*args)
+		# 	p args
+		# end
 
-    # Analyze Cucumber Scenario Tags
-    def after_tags(tags)
-      tags.each do |tag|
-        if AllureCucumber::Config.tms_prefix && tag.name.include?(AllureCucumber::Config.tms_prefix)
-          @scenario_tags[:testId] = remove_tag_prefix(tag.name, AllureCucumber::Config.tms_prefix)
-        end
+# feature.methods
+# [:language, :location, :background, :comments, :tags, :keyword, :description, :feature_elements,
+#  :children, :short_name, :to_sexp, :describe_to, :file_colon_line, :file, :line, :all_locations,
+#  :attributes, :multiline_arg, :name, :legacy_conflated_name_and_description, :to_s, :inspect]
 
-        if tag.name.include?(AllureCucumber::Config.issue_prefix)
-          @scenario_tags[:issue] = remove_tag_prefix(tag.name, AllureCucumber::Config.issue_prefix)
-        end
+# test_case.methods
+# [:source, :test_steps, :around_hooks, :step_count, :describe_to, :describe_source_to,
+#  :with_steps, :with_around_hooks, :name, :keyword, :tags, :match_tags?, :match_name?,
+#  :language, :location, :match_locations?, :all_locations, :all_source, :inspect, :feature]
 
-        if tag.name.include?(AllureCucumber::Config.severity_prefix) && ALLOWED_SEVERITIES.include?(remove_tag_prefix(tag.name, AllureCucumber::Config.severity_prefix))
-          @scenario_tags[:severity] = remove_tag_prefix(tag.name, AllureCucumber::Config.severity_prefix).downcase.to_sym
-        end
-      end
-    end
+# result.methods #with exception
+# [:duration, :exception, :describe_to, :to_s, :ok?, :with_duration, :with_appended_backtrace,
+#  :with_filtered_backtrace, :to_sym, :passed?, :failed?, :undefined?, :unknown?, :skipped?, :pending?]
+# result.methods #without exception
+# [:duration, :duration=, :describe_to, :to_s, :ok?, :with_appended_backtrace, :with_filtered_backtrace,
+#  :to_sym, :passed?, :failed?, :undefined?, :unknown?, :skipped?, :pending?]
+# result.methods #pending
+# [:describe_to, :to_s, :ok?, :to_sym, :passed?, :failed?, :undefined?, :unknown?, :skipped?,
+#  :pending?, :message, :duration, :with_message, :with_duration, :with_appended_backtrace,
+#  :with_filtered_backtrace, :exception, :==, :inspect, :backtrace, :backtrace_locations, :set_backtrace, :cause]
 
-    def before_examples(*args)
-      @header_row = true
-    end
 
-    # Start the test for normal scenarios
-    def before_steps(steps)
-      if !@scenario_outline  
-        start_test
-      end
-    end
+		def before_feature(feature)
+			@tracker.feature_name = feature.name
+			AllureRubyAdaptorApi::Builder.start_suite(@tracker.feature_name)
+		end
+		def after_feature(feature=nil)
+			AllureRubyAdaptorApi::Builder.stop_suite(@tracker.feature_name)
+			@tracker.feature_name = nil
+		end
+		def on_before_test_case(event)
+			test_case = event.test_case
+			feature = test_case.feature
+			if feature.name != @tracker.feature_name
+				after_feature if @tracker.feature_name != nil
+				before_feature(feature)
+			end
+			@tracker.scenario_name = test_case.name
+			AllureRubyAdaptorApi::Builder.start_test(@tracker.feature_name, @tracker.scenario_name, {feature: @tracker.feature_name, story: @tracker.scenario_name, start: Time.now})
+		end
+		def on_after_test_case(event)
+			result = event.result
+			allure_result = {stop: Time.now}.merge(cucumber_result_to_allure_result(result))
+			AllureRubyAdaptorApi::Builder.stop_test(@tracker.feature_name, @tracker.scenario_name, allure_result)
+			@tracker.scenario_name = nil
+		end
+		def on_before_test_step(event)
+			test_step = event.test_step
+			if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
+				@tracker.step_start_time = Time.now
+				@tracker.step_index += 1
+				@tracker.step_name = test_step.name
+				AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:index=>@tracker.step_index, :title=>@tracker.step_name, :start=>Time.now})
+			end
+		end
+		def on_after_test_step(event)
+			test_step = event.test_step
+			if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
+				result = event.result
+				allure_status = cucumber_status_to_allure_status(result)
+				AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:index=>@tracker.step_index, :title=>@tracker.step_name, :stop=>Time.now}, allure_status)
+			end
+		end
+		def on_finished_testing(event)
+			after_feature
+			AllureRubyAdaptorApi::Builder.build!
+		end
 
-    # Stop the test for normal scenarios
-    def after_steps(steps)
-      if !@scenario_outline
-        @result = test_result(steps)
-      end
-    end
+		def cucumber_status_to_allure_status(result)
+			allure_status = nil
+			POSSIBLE_STATUSES.each do |status|
+				if result.send("#{status}?")
+					case status.to_s
+						when "undefined"
+							allure_status = "broken"
+						when "skipped"
+							allure_status = "canceled"
+						else
+							allure_status = status.to_s
+					end
+				end
+			end
+			allure_status
+		end
+		def cucumber_result_to_allure_result(result)
+			exception = nil
+			if result.failed?
+				exception = result.exception
+			elsif result.pending?
+				exception = RuntimeError.new(result.message)
+				exception.set_backtrace(result.exception.backtrace)
+			end
 
-    def after_feature_element(feature_element)
-      @result[:status] = cucumber_status_to_allure_status(feature_element.status)
-      stop_test(@result)
-    end
+			allure_status = cucumber_status_to_allure_status(result)
 
-    # Start the test for scenario examples
-    def before_table_row(table_row)
-      if @scenario_outline && !@header_row && !@in_multiline_arg
-        @tracker.scenario_name = "#{@scenario_outline_name}: #{table_row.values.join(' | ')}"
-        start_test
-      end
-    end
-
-    # Stop the test for scenario examples 
-    def after_table_row(table_row)
-      unless @multiline_arg
-        if @scenario_outline && !@header_row
-          @result = test_result(table_row)
-          stop_test(@result)
-        end
-        @header_row = false
-      end
-    end
-    
-    def before_test_step(test_step)
-      @tracker.scenario_start_time ||= Time.now
-      if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
-        @tracker.step_start_time = Time.now
-        if @tracker.scenario_name
-          @tracker.step_index += 1
-          @tracker.step_name = test_step.name
-          start_step
-        else
-          @deferred_before_test_steps << {:step => test_step, :timestamp => @tracker.step_start_time}
-        end
-      end
-    end
-    
-    def after_test_step(test_step, result)
-      if TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
-        if (!@hook_exception) && result.methods.include?(:exception)
-          @hook_exception = result.exception
-        end
-      else
-        @tracker.step_stop_time = Time.now
-        if @tracker.scenario_name
-          status = step_status(result)
-          stop_step(status)
-        else
-          @deferred_after_test_steps << {:step => test_step, :result => result, :timestamp => @tracker.step_stop_time}
-        end
-      end
-    end
-
-    # Stop the suite
-    def after_feature(feature)
-      AllureRubyAdaptorApi::Builder.stop_suite(@tracker.feature_name)
-    end
-
-    def after_features(features)
-      AllureRubyAdaptorApi::Builder.build!
-    end
-    
-    def before_multiline_arg(multiline_arg)
-      @in_multiline_arg = true
-      # For background steps defer multiline attachment
-      if @tracker.scenario_name.nil?
-        @deferred_before_test_steps[-1].merge!({:multiline_arg => multiline_arg})
-      else
-        attach_multiline_arg_to_file(multiline_arg)
-      end
-    end
-
-    def after_multiline_arg(multiline_arg)
-      @in_multiline_arg = false
-    end
-    
-    private
-
-    def remove_tag_prefix(tag, prefix)
-      tag.gsub(prefix,'')
-    end
-    
-    def step_status(result)
-      POSSIBLE_STATUSES.each do |status|
-        return cucumber_status_to_allure_status(status) if result.send("#{status}?")
-      end
-    end
-    
-    def test_result(result)
-      status = cucumber_status_to_allure_status(result.status)
-
-      if result.exception
-        exception = result.exception
-      else
-        if status == 'failed'
-          exception = Exception.new("Some steps were undefined")
-        else
-          exception = @hook_exception
-        end
-      end
-
-      if status == 'pending' || status == 'canceled'
-        exc = Exception.new(exception.message)
-        exc.set_backtrace(exception.backtrace)
-        exception = exc
-      end
-      
-      if exception 
-        return {:status => status, :exception => exception}
-      else
-        return {:status => status}
-      end
-    end
-
-    def cucumber_status_to_allure_status(status)
-      case status.to_s
-        when "undefined"
-          return "broken"
-        when "skipped"
-          return "canceled"
-        else
-          return status.to_s
-      end
-    end
-    
-    def attach_multiline_arg_to_file(multiline_arg)
-      dir = File.expand_path(AllureCucumber::Config.output_dir)
-      out_file = "#{dir}/#{UUID.new.generate}.txt"     
-      File.open(out_file, "w+") { |file| file.write(multiline_arg.to_s.gsub(/\e\[(\d+)(;\d+)*m/,'')) }
-      attach_file("multiline_arg", File.open(out_file))
-    end
-
-    def start_test
-      if @tracker.scenario_name
-        @scenario_tags[:feature] = @tracker.feature_name
-        @scenario_tags[:story]   = @tracker.scenario_name
-        @scenario_tags[:start]   = @tracker.scenario_start_time
-        AllureRubyAdaptorApi::Builder.start_test(@tracker.feature_name, @tracker.scenario_name, @scenario_tags)
-        post_deferred_steps
-      end
-    end
-
-    def post_deferred_steps
-      @deferred_before_test_steps.size.times do |index|
-        @tracker.step_index += 1
-        @tracker.step_name = @deferred_before_test_steps[index][:step].name
-        @tracker.step_start_time = @deferred_before_test_steps[index][:timestamp]
-        start_step
-        multiline_arg = @deferred_before_test_steps[index][:multiline_arg]
-        attach_multiline_arg_to_file(multiline_arg) if multiline_arg
-        if index < @deferred_after_test_steps.size
-          result = step_status(@deferred_after_test_steps[index][:result])
-          @tracker.step_stop_time = @deferred_after_test_steps[index][:timestamp]
-          stop_step(result)
-        end
-      end
-    end
-    
-    def stop_test(result)
-      if @deferred_before_test_steps != []
-        result[:started_at] = @deferred_before_test_steps[0][:timestamp]
-      end
-      if @tracker.scenario_name
-        AllureRubyAdaptorApi::Builder.stop_test(@tracker.feature_name, @tracker.scenario_name, result)
-        @tracker.scenario_start_time = nil
-        @tracker.scenario_name = nil
-        @tracker.step_index = -1
-        @deferred_before_test_steps = []
-        @deferred_after_test_steps = []
-        @scenario_tags = {}
-        @hook_exception = nil
-      end
-    end
-    
-    def start_step(step = {:index=>@tracker.step_index, :title=>@tracker.step_name, :start=>@tracker.step_start_time})
-      AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, step)
-    end
-
-    def stop_step(status, step = {:index=>@tracker.step_index, :title=>@tracker.step_name, :stop=>@tracker.step_stop_time})
-      AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, step, status)
-    end
-    
-  end  
+			{status: allure_status, exception: exception}
+		end
+	end  
 end

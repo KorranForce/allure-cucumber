@@ -9,9 +9,9 @@ AllureCucumber.configure do |c|
 end
 
 Before do
+	p "in before hook"
 	#pending("before hook pending")
 	#raise "before hook exception1"
-	p "in before hook"
 	#sleep 2
 end
 # Before do
@@ -21,11 +21,11 @@ end
 # AfterStep do
 # 	raise "after step hook exception"
 # end
-# After do
-# 	#raise "after hook exception"
-# 	p "in after hook"
-# 	sleep 2
-# end
+After do
+	p "in after hook"
+	#raise "after hook exception"
+	#sleep 2
+end
 # AfterStep do |result, source_step|
 # 	p result
 #   p source_step

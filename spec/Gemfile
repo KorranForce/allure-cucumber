@@ -9,7 +9,7 @@ end
 source "http://rubygems.org"
 
 gem "cucumber"
-gem "allure-ruby-adaptor-api", :git => "https://github.com/KorranForce/allure-ruby-adaptor-api.git", :branch => 'master'
+gem "allure-ruby-adaptor-api", git: "https://github.com/KorranForce/allure-ruby-adaptor-api.git", branch: 'develop'
 gem "rspec"
 gem "unicode"
 gem "russian"
