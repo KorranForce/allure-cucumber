@@ -83,7 +83,7 @@ module AllureCucumber
 				@tracker.step_start_time = Time.now
 				@tracker.step_index += 1
 				@tracker.step_name = test_step.name
-				AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {:index=>@tracker.step_index, :title=>@tracker.step_name, :start=>Time.now})
+				AllureRubyAdaptorApi::Builder.start_step(@tracker.feature_name, @tracker.scenario_name, {index: @tracker.step_index, title: @tracker.step_name, start: Time.now})
 			end
 		end
 		def on_after_test_step(event)
@@ -91,7 +91,7 @@ module AllureCucumber
 			if !TEST_HOOK_NAMES_TO_IGNORE.include?(test_step.name)
 				result = event.result
 				allure_status = cucumber_status_to_allure_status(result)
-				AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {:index=>@tracker.step_index, :title=>@tracker.step_name, :stop=>Time.now}, allure_status)
+				AllureRubyAdaptorApi::Builder.stop_step(@tracker.feature_name, @tracker.scenario_name, {index: @tracker.step_index, title: @tracker.step_name, stop: Time.now}, allure_status)
 			end
 		end
 		def on_finished_testing(event)
