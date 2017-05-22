@@ -41,7 +41,14 @@ module AllureCucumber
 				after_feature if @tracker.feature_name != nil
 				before_feature(feature)
 			end
-			@tracker.scenario_name = test_case.name
+
+			scenario_data = obtain_scenario_data(test_case)
+			#TODO: handle background steps
+			if scenario_data.scenario_outline
+				@tracker.scenario_name = proper_scenario_outline_name(scenario_data)
+			else
+				@tracker.scenario_name = test_case.name
+			end
 			AllureRubyAdaptorApi::Builder.start_test(@tracker.feature_name, @tracker.scenario_name, {feature: @tracker.feature_name, story: @tracker.scenario_name, start: Time.now})
 		end
 		def on_after_test_case(event)
@@ -102,5 +109,34 @@ module AllureCucumber
 
 			{status: allure_status, exception: exception}
 		end
-	end  
+
+		ScenarioData = Struct.new(:background, :scenario, :scenario_outline, :examples_table, :examples_table_row)
+		def obtain_scenario_data(test_case)
+			background = test_case.feature.background
+			scenario = nil
+			scenario_outline = nil
+			examples_table = nil
+			examples_table_row = nil
+			test_case.source.each {|source_object|
+				case source_object
+					when Cucumber::Core::Ast::Scenario
+						scenario = source_object
+					when Cucumber::Core::Ast::ScenarioOutline
+						scenario_outline = source_object
+					when Cucumber::Core::Ast::Examples
+						examples_table = source_object
+					when Cucumber::Core::Ast::ExamplesTable::Row
+						examples_table_row = source_object
+				end
+			}
+			ScenarioData.new(background, scenario, scenario_outline, examples_table, examples_table_row)
+		end
+		def proper_scenario_outline_name(scenario_data)
+			headers = scenario_data.examples_table.header.values
+			values = scenario_data.examples_table_row.values
+			key_value_pairs = []
+			headers.size.times {|i| key_value_pairs << "#{headers[i]}: #{values[i]}"}
+			"#{scenario_data.scenario_outline.name}: {#{key_value_pairs.join(", ")}}"
+		end
+	end
 end
