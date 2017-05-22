@@ -4,7 +4,6 @@ require 'allure-ruby-adaptor-api'
 
 module AllureCucumber
 	class Formatter
-		include AllureCucumber::DSL
 
 		TEST_HOOK_NAMES_TO_IGNORE = ['Before hook', 'After hook', 'AfterStep hook']
 		#ALLOWED_SEVERITIES = ['blocker', 'critical', 'normal', 'minor', 'trivial']
@@ -50,6 +49,7 @@ module AllureCucumber
 			allure_result = {stop: Time.now}.merge(cucumber_result_to_allure_result(result))
 			AllureRubyAdaptorApi::Builder.stop_test(@tracker.feature_name, @tracker.scenario_name, allure_result)
 			@tracker.scenario_name = nil
+			@tracker.step_index = -1
 		end
 		def on_before_test_step(event)
 			test_step = event.test_step
@@ -72,6 +72,7 @@ module AllureCucumber
 			AllureRubyAdaptorApi::Builder.build!
 		end
 
+		private
 		def cucumber_status_to_allure_status(result)
 			allure_status = nil
 			POSSIBLE_STATUSES.each do |status|
